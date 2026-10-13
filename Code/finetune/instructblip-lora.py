@@ -10,7 +10,7 @@ from tqdm import tqdm
 import pickle
 
 model_dir = '/projects/Models/'
-image_dir = '/projects/SpatialMQA/COCO2017/test2017/'
+image_dir = '/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/COCO2017/test2017/'
 
 from peft import LoraConfig, get_peft_model
 
@@ -23,11 +23,11 @@ config = LoraConfig(
     target_modules=["q", "k"]
 )
 
-processor = InstructBlipProcessor.from_pretrained("Salesforce/instructblip-flan-t5-xl")
+processor = InstructBlipProcessor.from_pretrained("Salesforce/instructblip-flan-t5-xl", revision="a24b501a4104cd714544c3d354873d44f6ceabba")
 
-device = "cuda:6" if torch.cuda.is_available() else "cpu"
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-model = InstructBlipForConditionalGeneration.from_pretrained("Salesforce/instructblip-flan-t5-xl")
+model = InstructBlipForConditionalGeneration.from_pretrained("Salesforce/instructblip-flan-t5-xl", revision="a24b501a4104cd714544c3d354873d44f6ceabba")
 
 model = get_peft_model(model, config).to(device)
 
@@ -53,7 +53,7 @@ class VQADataset(torch.utils.data.Dataset):
         image_path = f"{image_dir}{image_id}"
         image = Image.open(image_path).convert("RGB")
 
-        encoding = self.processor(images=image, text=question, return_tensors="pt")
+        encoding = self.processor(images=image, text=question, padding="max_length", max_length=128, truncation=True, return_tensors="pt")
         labels = self.processor.tokenizer.encode(
             answer, max_length=8, pad_to_max_length=True, return_tensors='pt'
         )
@@ -65,9 +65,9 @@ class VQADataset(torch.utils.data.Dataset):
         return encoding
 
 
-training_dataset = load_dataset("json", data_files="/projects/SpatialMQA/datasets/instructblip_train/train_3780.jsonl",
+training_dataset = load_dataset("json", data_files="/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/instructblip_train/train_3780.jsonl",
                                 split="train[:100%]")
-valid_dataset = load_dataset("json", data_files="/projects/SpatialMQA/datasets/instructblip_train/dev_536.jsonl",
+valid_dataset = load_dataset("json", data_files="/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/instructblip_train/dev_536.jsonl",
                              split="train[:100%]")
 print("Training sets: {} - Validating set: {}".format(len(training_dataset), len(valid_dataset)))
 
@@ -142,9 +142,9 @@ for epoch in range(num_epochs):
                                                                           optimizer.param_groups[0]["lr"]))
     scheduler.step()
     if eval_loss < min_eval_loss:
-        model.save_pretrained("/projects/SpatialMQA/finetune_models/models_arg/instructblip_lora_20240530",
+        model.save_pretrained("/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/finetune_models/models_arg/instructblip_lora_20240530",
                               from_pt=True)
-        print("Saved model to /projects/SpatialMQA/finetune_models/models_arg/instructblip_lora_20240530")
+        print("Saved model to /lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/finetune_models/models_arg/instructblip_lora_20240530")
         min_eval_loss = eval_loss
         early_stopping_hook = 0
     else:

@@ -3,10 +3,10 @@
 deepspeed --include localhost:6 llava/train/train_mem.py \
     --lora_enable True --lora_r 128 --lora_alpha 256 --mm_projector_lr 2e-5 \
     --deepspeed ./scripts/zero3.json \
-    --model_name_or_path /projects/Models/LLaVA-main/llava-v1.5-7b \
+    --model_name_or_path liuhaotian/llava-v1.5-7b \
     --version v1 \
-    --data_path /projects/SpatialMQA/datasets/llava_train/train_3780.json \
-    --image_folder /projects \
+    --data_path /lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/llava_train/train_3780.json \
+    --image_folder /lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/COCO2017/test2017 \
     --vision_tower openai/clip-vit-large-patch14-336 \
     --mm_projector_type mlp2x_gelu \
     --mm_vision_select_layer -2 \
@@ -15,11 +15,11 @@ deepspeed --include localhost:6 llava/train/train_mem.py \
     --image_aspect_ratio pad \
     --group_by_modality_length True \
     --bf16 True \
-    --output_dir /projects/SpatialMQA/finetune_models/models_arg/llava_lora_20240601 \
+    --output_dir /lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/finetune_models/models_arg/llava_lora_20240601 \
     --num_train_epochs 10 \
     --per_device_train_batch_size 8 \
     --per_device_eval_batch_size 4 \
-    --gradient_accumulation_steps 2 \
+    --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
     --save_steps 100 \

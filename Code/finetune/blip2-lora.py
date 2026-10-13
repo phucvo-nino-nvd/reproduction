@@ -13,19 +13,19 @@ from tqdm import tqdm
 import pickle
 from peft import LoraConfig, get_peft_model
 
-model_dir = '/projects/Models/'
-processor = Blip2Processor.from_pretrained(f"{model_dir}blip2-opt-2.7b")
-image_dir = '/projects/SpatialMQA/COCO2017/test2017/'
+model_dir = 'Salesforce/'
+processor = Blip2Processor.from_pretrained(f"{model_dir}blip2-opt-2.7b", revision="51572668da0eb669e01a189dc22abe6088589a24")
+image_dir = '/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/COCO2017/test2017/'
 
-train_ds = load_dataset("json", data_files="/projects/SpatialMQA/datasets/blip2_train/train_3780.jsonl",
+train_ds = load_dataset("json", data_files="/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/blip2_train/train_3780.jsonl",
                         split="train[:100%]")
-eval_ds = load_dataset("json", data_files="/projects/SpatialMQA/datasets/blip2_train/dev_536.jsonl",
+eval_ds = load_dataset("json", data_files="/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/blip2_train/dev_536.jsonl",
                        split="train[:100%]")
 print("Training sets: {} - Validating set: {}".format(len(train_ds), len(eval_ds)))
 
-device = "cuda:7" if torch.cuda.is_available() else "cpu"
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-model = Blip2ForConditionalGeneration.from_pretrained(f"{model_dir}blip2-opt-2.7b", device_map="cuda:7",
+model = Blip2ForConditionalGeneration.from_pretrained(f"{model_dir}blip2-opt-2.7b", revision="51572668da0eb669e01a189dc22abe6088589a24", device_map="cuda:0",
                                                       load_in_8bit=True)
 
 # Let's define the LoraConfig
@@ -56,14 +56,16 @@ class ImageCaptioningDataset(Dataset):
         question = self.dataset[idx]['question']
         answer = str(self.dataset[idx]['answer'])
         image_id = self.dataset[idx]['image']
-        image_path = f"/projects/SpatialMQA/COCO2017/test2017/{image_id}"
+        image_path = f"/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/COCO2017/test2017/{image_id}"
         image = Image.open(image_path).convert("RGB")
 
-        encoding = self.processor(images=image, text=question, return_tensors="pt")
-
-        labels = self.processor.tokenizer.tokenize(answer, return_tensors='pt')
-        labels = torch.tensor(self.processor.tokenizer.convert_tokens_to_ids(labels)).unsqueeze(0)
-        encoding["labels"] = torch.cat((labels, torch.tensor([50118]).unsqueeze(0)), dim=1)
+        encoding = self.processor(images=image, text=f"{question} {answer}\n", padding="max_length",
+                                  max_length=128, truncation=True, return_tensors="pt")
+        question_len = len(self.processor.tokenizer(question).input_ids)
+        labels = encoding["input_ids"].clone()
+        labels[:, :question_len] = -100
+        labels[encoding["attention_mask"] == 0] = -100
+        encoding["labels"] = labels
 
         # remove batch dimension
         for k, v in encoding.items():  encoding[k] = v.squeeze()
@@ -80,7 +82,7 @@ valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=Fals
 optimizer = torch.optim.AdamW(model.parameters(), lr=4e-5)
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9, last_epoch=-1, verbose=False)
 
-cal_num = 2
+cal_num = 1
 num_epochs = 30
 patience = 5
 min_eval_loss = float("inf")
@@ -100,12 +102,10 @@ for epoch in range(num_epochs):
         labels = batch.pop('labels').to(device)
 
         with torch.amp.autocast(device_type='cuda', dtype=torch.bfloat16):
-            outputs = model(input_ids=input_ids,
-                            pixel_values=pixel_values,
-                            attention_mask=attention_mask).logits
-
-        loss = criterion(outputs.view(-1, outputs.shape[-1])[:labels.shape[1], :].contiguous(),
-                         labels.view(-1).contiguous())
+            loss = model(input_ids=input_ids,
+                         pixel_values=pixel_values,
+                         attention_mask=attention_mask,
+                         labels=labels).loss
         epoch_loss += loss.item()
         optimizer.zero_grad()
 
@@ -136,12 +136,10 @@ for epoch in range(num_epochs):
         # loss = outputs.loss
 
         # labels_mask = batch.pop('labels_mask').to(device)
-        outputs = model(input_ids=input_ids,
-                        pixel_values=pixel_values,
-                        attention_mask=attention_mask).logits
-        # loss = criterion(outputs.view(-1, outputs.shape[-1])[:8, :].contiguous() * labels_mask.view(-1, 1).contiguous(), labels.view(-1).contiguous())
-        loss = criterion(outputs.view(-1, outputs.shape[-1])[:labels.shape[1], :].contiguous(),
-                         labels.view(-1).contiguous())
+        loss = model(input_ids=input_ids,
+                     pixel_values=pixel_values,
+                     attention_mask=attention_mask,
+                     labels=labels).loss
 
         eval_loss += loss.item()
         # break
@@ -155,9 +153,9 @@ for epoch in range(num_epochs):
                                                                           optimizer.param_groups[0]["lr"]))
     scheduler.step()
     if eval_loss < min_eval_loss:
-        model.save_pretrained(f"/projects/SpatialMQA/finetune_models/models_arg/blip2_lora_20240531/epoch-{epoch}",
+        model.save_pretrained(f"/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/finetune_models/models_arg/blip2_lora_20240531/epoch-{epoch}",
                               from_pt=True)
-        print(f"Saved model to /projects/SpatialMQA/finetune_models/models_arg/blip2_lora_20240531")
+        print(f"Saved model to /lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/finetune_models/models_arg/blip2_lora_20240531")
         min_eval_loss = eval_loss
         early_stopping_hook = 0
     else:

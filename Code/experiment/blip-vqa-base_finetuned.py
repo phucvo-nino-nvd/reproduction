@@ -1,29 +1,29 @@
+import os
 import requests
 from PIL import Image
 from transformers import BlipProcessor, BlipForQuestionAnswering
 import torch
-RESULT_FILE_PATH = '/projects/SpatialMQA/output/blip/'
-FILE_PATH = '/projects/SpatialMQA/datasets/spatial/'
-DEVICE_INDEX = torch.device("cuda:6" if torch.cuda.is_available() else "cpu")
+RESULT_FILE_PATH = '/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/output/blip/'
+FILE_PATH = '/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/dataset/'
+DEVICE_INDEX = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 processor = BlipProcessor.from_pretrained(f"Salesforce/blip-vqa-base")
 
-for i in range(8):
-    model = BlipForQuestionAnswering.from_pretrained(f"/projects/SpatialMQA/finetune_models/models_arg/blip_finetune_20240602/epoch-{i}").to(DEVICE_INDEX)
+for i in sorted(int(d.split('-')[1]) for d in os.listdir('/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/finetune_models/models_arg/blip_finetune_20240602')):
+    model = BlipForQuestionAnswering.from_pretrained(f"/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/finetune_models/models_arg/blip_finetune_20240602/epoch-{i}").to(DEVICE_INDEX)
 
     import json
-    image_dir = '/projects/SpatialMQA/COCO2017/test2017/'
+    image_dir = '/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/COCO2017/test2017/'
     count = 0
     right_count = 0
-    with open(f'{FILE_PATH}all_en_test_1076_sort.jsonl', 'r', encoding="utf-8") as f,open(f'{RESULT_FILE_PATH}blip_finetuned_{i}.jsonl', 'w', encoding="utf-8") as fout:
-        for line in f:
+    with open(f'{FILE_PATH}test.jsonl', 'r', encoding="utf-8") as f,open(f'{RESULT_FILE_PATH}blip_finetuned_{i}.jsonl', 'w', encoding="utf-8") as fout:
+        for id, line in enumerate(f):
             data = json.loads(line)
             question = data['question']
-            id = data['id']
             options = data['options']
             image_name = data['image']
             image_filepath = image_dir + image_name
             image = Image.open(image_filepath).convert('RGB')
-            question = f'{question} {",".join(options[:-1])} or {options[-1]}'
+            question = f'Input: Image: <image>, Question: {question}, Options: {"; ".join(options)}. \n Output:'
             inputs = processor(images=image, text=question, return_tensors="pt").to(DEVICE_INDEX)
             predictions = model.generate(**inputs)
             output = (processor.decode(predictions[0], skip_special_tokens=True))

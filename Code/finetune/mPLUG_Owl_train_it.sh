@@ -23,7 +23,7 @@ DISTRIBUTED_ARGS="--nproc_per_node 2 \
 EXP_NAME=sft_v0.1
 SAVE_NAME=mplug_lora_20240530
 
-SAVE_PATH="/projects/SpatialMQA/finetune_models/models_arg/${SAVE_NAME}/"
+SAVE_PATH="/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/finetune_models/models_arg/${SAVE_NAME}/"
 
 max_length=2048
 micro_batch_size=4
@@ -69,4 +69,4 @@ multimodal_options=" \
 	--mm-config configs/v0.yaml 
     "
 
-HF_ENDPOINT=https://hf-mirror.com CUDA_VISIBLE_DEVICES=5,6 python -m torch.distributed.launch $DISTRIBUTED_ARGS ./pipeline/train.py $@ ${options} ${multimodal_options} 2>&1 | tee /projects/SpatialMQA/finetune_models/finetune_code/log/20240530_mplug_train.log 
+CUDA_VISIBLE_DEVICES=4,5 python -m torch.distributed.launch $DISTRIBUTED_ARGS ./pipeline/train.py $@ ${options} ${multimodal_options} 2>&1 | tee /lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/finetune_models/finetune_code/log/20240530_mplug_train.log 

@@ -6,11 +6,11 @@ import torch
 from transformers import IdeficsForVisionText2Text, AutoProcessor, BitsAndBytesConfig
 from peft import PeftModel, PeftConfig
 
-device = "cuda:5"
-RESULT_FILE_PATH = '/projects/SpatialMQA/output/idefics-10/'
-FILE_PATH = '/projects/SpatialMQA/datasets/spatial/'
+device = "cuda:0"
+RESULT_FILE_PATH = '/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/output/idefics-10/'
+FILE_PATH = '/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/dataset/'
 
-model_path = '/projects/Models/idefics/'
+model_path = '/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/finetune_models/models_arg/idefics_lora_20240521/'
 
 bnb_config = BitsAndBytesConfig(
     load_in_4bit=True,
@@ -22,9 +22,9 @@ bnb_config = BitsAndBytesConfig(
 
 config = PeftConfig.from_pretrained(model_path)
 processor = AutoProcessor.from_pretrained(config.base_model_name_or_path)
-model = IdeficsForVisionText2Text.from_pretrained(config.base_model_name_or_path,quantization_config=bnb_config,device_map="cuda:5")
+model = IdeficsForVisionText2Text.from_pretrained(config.base_model_name_or_path,quantization_config=bnb_config,device_map="cuda:0")
 
-image_dir = '/projects/SpatialMQA/COCO2017/test2017/'
+image_dir = '/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/COCO2017/test2017/'
 count = 0
 right_count = 0
 
@@ -44,11 +44,10 @@ def check_inference(model, processor, prompts, max_new_tokens=50):
     return generated_text
 
 
-with open(f'{FILE_PATH}all_en_test_1076_sort.jsonl', 'r', encoding="utf-8") as f,open(f'{RESULT_FILE_PATH}idefics_test.jsonl', 'w+', encoding="utf-8") as fout:
-    for line in f:
+with open(f'{FILE_PATH}test.jsonl', 'r', encoding="utf-8") as f,open(f'{RESULT_FILE_PATH}idefics_test.jsonl', 'w+', encoding="utf-8") as fout:
+    for id, line in enumerate(f):
         data = json.loads(line)
         question = data['question']
-        id = data['id']
         options = data['options']
         image_name = data['image']
         image_filepath = image_dir + image_name
@@ -61,7 +60,7 @@ with open(f'{FILE_PATH}all_en_test_1076_sort.jsonl', 'r', encoding="utf-8") as f
 
         generated_text = check_inference(model, processor, prompts, max_new_tokens=5)
         print(f'generated_text:\n{generated_text}')
-        output = generated_text.lower().split('answer:')[-1].split('\n')[0].strip().rstrip('.')
+        output = generated_text.lower().split('output:')[-1].split('\n')[0].strip().rstrip('.')
         count += 1
         if len(output) == 0:
             output = '--'

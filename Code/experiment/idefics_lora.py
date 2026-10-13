@@ -3,11 +3,11 @@
 import torch
 from transformers import IdeficsForVisionText2Text, AutoProcessor, BitsAndBytesConfig
 
-device = "cuda:7" if torch.cuda.is_available() else "cpu"
-RESULT_FILE_PATH = '/projects/SpatialMQA/output/idefics-10/'
-FILE_PATH = '/projects/SpatialMQA/datasets/spatial/'
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
+RESULT_FILE_PATH = '/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/output/idefics-10/'
+FILE_PATH = '/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/dataset/'
 
-lora_point = '/projects/SpatialMQA/finetune_models/models_arg/idefics_lora_20240521/checkpoint-35'
+lora_point = '/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/finetune_models/models_arg/idefics_lora_20240521'
 
 from peft import PeftModel, PeftConfig
 
@@ -21,14 +21,14 @@ bnb_config = BitsAndBytesConfig(
 
 config = PeftConfig.from_pretrained(lora_point)
 processor = AutoProcessor.from_pretrained(config.base_model_name_or_path)
-model = IdeficsForVisionText2Text.from_pretrained(config.base_model_name_or_path,quantization_config=bnb_config,device_map="cuda:7")
+model = IdeficsForVisionText2Text.from_pretrained(config.base_model_name_or_path,quantization_config=bnb_config,device_map="cuda:0")
 model = PeftModel.from_pretrained(model, lora_point).to(device)
 
 
 import json
 import re
 from PIL import Image
-image_dir = '/projects/SpatialMQA/COCO2017/test2017/'
+image_dir = '/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/COCO2017/test2017/'
 count = 0
 right_count = 0
 
@@ -48,16 +48,15 @@ def check_inference(model, processor, prompts, max_new_tokens=50):
     return generated_text
 
 
-with open(f'{FILE_PATH}all_en_test_1076_sort.jsonl', 'r', encoding="utf-8") as f,open(f'{RESULT_FILE_PATH}idefics_lora_7.jsonl', 'w+', encoding="utf-8") as fout:
-    for line in f:
+with open(f'{FILE_PATH}test.jsonl', 'r', encoding="utf-8") as f,open(f'{RESULT_FILE_PATH}idefics_lora_7.jsonl', 'w+', encoding="utf-8") as fout:
+    for id, line in enumerate(f):
         data = json.loads(line)
         question = data['question']
-        id = data['id']
         options = data['options']
         image_name = data['image']
         image_filepath = image_dir + image_name
         image = Image.open(image_filepath)
-        question = f'You are currently a senior expert in spatial relation reasoning. \n Given an Image, a Question and Options, your task is to answer the correct spatial relation. Note that you only need to choose one option from the all options without explaining any reason. \n Input: Image: <image>, Question: {question}, Options: {"; ".join(options)}. \nOutput:'
+        question = f'You are currently a senior expert in spatial relation reasoning. \n Given an Image, a Question, and Options, your task is to answer the correct spatial relation. Note that you only need to choose one option from all options without explaining any reason. \n Input: Image: , Question: {question}, Options: {"; ".join(options)}. \n Output:'
         prompts = [
             image,
             question,
@@ -65,7 +64,7 @@ with open(f'{FILE_PATH}all_en_test_1076_sort.jsonl', 'r', encoding="utf-8") as f
 
         generated_text = check_inference(model, processor, prompts, max_new_tokens=5)
         print(f'generated_text:\n{generated_text}')
-        output = generated_text.lower().split('answer:')[-1].split('\n')[0].strip().rstrip('.')
+        output = generated_text.lower().split('output:')[-1].split('\n')[0].strip().rstrip('.')
         count += 1
         if len(output) == 0:
             output = '--'

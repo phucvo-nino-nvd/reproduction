@@ -1,5 +1,5 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "4"
+os.environ["CUDA_VISIBLE_DEVICES"] = "7"
 
 import argparse
 import torch
@@ -26,10 +26,10 @@ import requests
 from PIL import Image
 from io import BytesIO
 import re
-RESULT_FILE_PATH = '/home/zouyinan/SpatialVLM/SpaceLLaVa/spacellava/results/20240816/1000_valid.jsonl'
+RESULT_FILE_PATH = '/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/output/spacellava_lora_0.jsonl'
 # FILE_PATH = '/projects/SpatialMethod/Dataset/En_new/'
-FILE_PATH = '/home/zouyinan/SpatialVLM/SpaceLLaVa/valid.jsonl'
-IMAGE_DIR = '/home/zouyinan/SpatialVLM/SpaceLLaVa/pic/'
+FILE_PATH = '/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/dataset/test.jsonl'
+IMAGE_DIR = '/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/COCO2017/test2017/'
 def image_parser(args):
     out = args.image_file.split(args.sep)
     return out
@@ -54,13 +54,13 @@ def load_images(image_files):
 
 # Model
 disable_torch_init()
-model_path='/home/zouyinan/SpatialVLM/SpaceLLaVa/spacellava/spacellava_hf'
+model_path='/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/finetune_models/models_arg/spacellava_lora_20240816'
 args = type('Args', (), {
     "model_path": model_path,
-    "model_base": None,
+    "model_base": '/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/checkpoints/spacellava_hf',
     "model_name": get_model_name_from_path(model_path),
     # "query": prompt,
-    "conv_mode": None,
+    "conv_mode": "v1",
     # "image_file": image_file,
     "sep": ",",
     "temperature": 0.1,
@@ -71,12 +71,11 @@ args = type('Args', (), {
 
 model_name = get_model_name_from_path(model_path)
 tokenizer, model, image_processor, context_len = load_pretrained_model(
-    args.model_path, None, model_name
+    args.model_path, args.model_base, model_name
 )
+model.to(torch.bfloat16)
 # peft_model_id = "/projects/SpatialMQA/finetune_models/models_arg/llava_lora_20240522"
 # peft_model_id = '/home/zouyinan/SpatialVLM/SpaceLLaVa/spacellava/saved_model/spacellava_lora_20240812_3/checkpoint-460'
-peft_model_id = "/home/zouyinan/SpatialVLM/SpaceLLaVa/spacellava/saved_model/spacellava_lora_20240816_1000"
-model.load_adapter(peft_model_id)
 
 def eval_model(args,question,image_file):
     qs = question
@@ -125,7 +124,7 @@ def eval_model(args,question,image_file):
         images,
         image_processor,
         model.config
-    ).to(model.device, dtype=torch.float16)
+    ).to(model.device, dtype=torch.bfloat16)
 
     input_ids = (
         tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt")
@@ -152,15 +151,14 @@ count = 0
 right_count = 0
 
 with open(f'{FILE_PATH}', 'r', encoding="utf-8") as f,open(f'{RESULT_FILE_PATH}', 'w+', encoding="utf-8") as fout:
-    for line in f:
+    for id, line in enumerate(f):
         data = json.loads(line)
         question = data['question']
-        id = data['id']
         options = data['options']
         image_name = data['image']
         image_filepath = IMAGE_DIR + image_name
         # question = f'Question: {question} According to the question, please choose one best option from the following options separated by semicolon. Note that you only need to answer one word from the options without explaining the reason.\nOptions: {"; ".join(options)} \nAnswer:'
-        question = f'You are currently a senior expert in spatial relation reasoning. \n Given an Image, a Question, and Options, your task is to answer the correct spatial relation. Note that you only need to choose one option from the all options without explaining any reason. \n Input: , Question: {question}, Options: {"; ".join(options)}. \n Output:'
+        question = f'You are currently a senior expert in spatial relation reasoning. \n Given an Image, a Question, and Options, your task is to answer the correct spatial relation. Note that you only need to choose one option from all options without explaining any reason. \n Input: Image: , Question: {question}, Options: {"; ".join(options)}. \n Output:'
         output = eval_model(args,question,image_filepath)
         
         count += 1

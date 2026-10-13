@@ -12,7 +12,7 @@ import pickle
 model = BlipForQuestionAnswering.from_pretrained("Salesforce/blip-vqa-base")
 processor = BlipProcessor.from_pretrained("Salesforce/blip-vqa-base")
 
-device = torch.device("cuda:7" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model.to(device)
 
 torch.cuda.empty_cache()
@@ -33,7 +33,7 @@ class VQADataset(torch.utils.data.Dataset):
         question = self.dataset[idx]['question']
         answer = str(self.dataset[idx]['answer'])
         image_id = self.dataset[idx]['image']
-        image_path = f"/projects/SpatialMQA/COCO2017/test2017/{image_id}"
+        image_path = f"/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/COCO2017/test2017/{image_id}"
         image = Image.open(image_path).convert("RGB")
         text = question
 
@@ -47,9 +47,9 @@ class VQADataset(torch.utils.data.Dataset):
         return encoding
 
 
-training_dataset = load_dataset("json", data_files="/projects/SpatialMQA/datasets/blip_train/train_3780.jsonl",
+training_dataset = load_dataset("json", data_files="/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/blip_train/train_3780.jsonl",
                                 split="train[:100%]")
-valid_dataset = load_dataset("json", data_files="/projects/SpatialMQA/datasets/blip_train/dev_536.jsonl",
+valid_dataset = load_dataset("json", data_files="/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/blip_train/dev_536.jsonl",
                              split="train[:100%]")
 print("Training sets: {} - Validating set: {}".format(len(training_dataset), len(valid_dataset)))
 
@@ -59,7 +59,7 @@ valid_dataset = VQADataset(dataset=valid_dataset,
                            processor=processor)
 
 batch_size = 8
-cal_num = 2
+cal_num = 1
 torch.manual_seed(42)
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False, pin_memory=True)
 valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False, pin_memory=True)
@@ -129,9 +129,9 @@ for epoch in range(num_epochs):
                                                                           optimizer.param_groups[0]["lr"]))
     scheduler.step()
     if eval_loss < min_eval_loss:
-        model.save_pretrained(f"/projects/SpatialMQA/finetune_models/models_arg/blip_finetune_20240602/epoch-{epoch}",
+        model.save_pretrained(f"/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/finetune_models/models_arg/blip_finetune_20240602/epoch-{epoch}",
                               from_pt=True)
-        print(f"Saved model to /projects/SpatialMQA/finetune_models/models_arg/blip_finetune_20240602/epoch-{epoch}")
+        print(f"Saved model to /lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/finetune_models/models_arg/blip_finetune_20240602/epoch-{epoch}")
         min_eval_loss = eval_loss
         early_stopping_hook = 0
     else:

@@ -4,25 +4,24 @@ from transformers import BlipProcessor, BlipForQuestionAnswering
 import torch
 import json
 
-RESULT_FILE_PATH = '/projects/SpatialMQA/output/'
-FILE_PATH = '/projects/SpatialMQA/datasets/spatial/'
-DEVICE_INDEX = torch.device("cuda:7" if torch.cuda.is_available() else "cpu")
+RESULT_FILE_PATH = '/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/output/'
+FILE_PATH = '/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/dataset/'
+DEVICE_INDEX = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 processor = BlipProcessor.from_pretrained(f"Salesforce/blip-vqa-base")
 model = BlipForQuestionAnswering.from_pretrained(f"Salesforce/blip-vqa-base").to(DEVICE_INDEX)
 
-image_dir = '/projects/SpatialMQA/COCO2017/test2017/'
+image_dir = '/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/COCO2017/test2017/'
 count = 0
 right_count = 0
-with open(f'{FILE_PATH}all_en_test_1076_sort.jsonl', 'r', encoding="utf-8") as f,open(f'{RESULT_FILE_PATH}blip.jsonl', 'w+', encoding="utf-8") as fout:
-    for line in f:
+with open(f'{FILE_PATH}test.jsonl', 'r', encoding="utf-8") as f,open(f'{RESULT_FILE_PATH}blip.jsonl', 'w+', encoding="utf-8") as fout:
+    for id, line in enumerate(f):
         data = json.loads(line)
         question = data['question']
-        id = data['id']
         options = data['options']
         image_name = data['image']
         image_filepath = image_dir + image_name
         image = Image.open(image_filepath).convert('RGB')
-        question = f'{question} {",".join(options[:-1])} or {options[-1]}'
+        question = f'Input: Image: <image>, Question: {question}, Options: {"; ".join(options)}. \n Output:'
         print(question)
         inputs = processor(images=image, text=question, return_tensors="pt").to(DEVICE_INDEX)
         predictions = model.generate(**inputs)

@@ -13,7 +13,7 @@ from PIL import Image
 from transformers import IdeficsForVisionText2Text, AutoProcessor, Trainer, TrainingArguments, BitsAndBytesConfig
 import torchvision.transforms as transforms
 
-device = "cuda:7" if torch.cuda.is_available() else "cpu"
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 checkpoint = "HuggingFaceM4/idefics-9b"
 
@@ -55,14 +55,13 @@ prompts = [
 ]
 check_inference(model, processor, prompts)
 
-train_ds = load_dataset("json", data_files='/projects/SpatialMQA/datasets/idefics_train/train_3780.jsonl')['train']
-eval_ds = load_dataset("json", data_files='/projects/SpatialMQA/datasets/idefics_train/dev_536.jsonl')['train']
+train_ds = load_dataset("json", data_files='/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/idefics_train/train_3780.jsonl')['train']
+eval_ds = load_dataset("json", data_files='/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/Dataset/idefics_train/dev_536.jsonl')['train']
 
 
 def convert_to_rgb(image):
     # `image.convert("RGB")` would only work for .jpg images, as it creates a wrong background
     # for transparent images. The call to `alpha_composite` handles this case
-    image = Image.open(image)
     if image.mode == "RGB":
         return image
 
@@ -87,10 +86,10 @@ def ds_transforms(example_batch):
     ])
 
     prompts = []
-    for i in range(len(example_batch)):
+    for i in range(len(example_batch["text"])):
         prompts.append(
             [
-                example_batch["image"][i],
+                Image.open(example_batch["image"][i]),
                 example_batch["text"][i],
             ],
         )
@@ -118,14 +117,14 @@ model = get_peft_model(model, config)
 num_train_epochs = 10
 
 training_args = TrainingArguments(
-    output_dir=f"/projects/SpatialMQA/finetune_models/models_arg/idefics_lora_20240521",
-    num_train_epochs=5,
+    output_dir=f"/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/finetune_models/models_arg/idefics_lora_20240521",
+    num_train_epochs=10,
     learning_rate=2e-4,
     bf16=True,
     fp16=False,
     per_device_train_batch_size=8,
     per_device_eval_batch_size=8,
-    gradient_accumulation_steps=8,
+    gradient_accumulation_steps=1,
     dataloader_pin_memory=False,
     save_total_limit=1,
     evaluation_strategy="epoch",
@@ -148,6 +147,6 @@ trainer = Trainer(
 
 trainer.train()
 
-model.save_pretrained("/projects/SpatialMQA/finetune_models/models_arg/idefics_lora_20240521")
+model.save_pretrained("/lfs/skampere1/0/truongvo/projects/icd-agent/experiments/mas_icd/SpatialMQA/finetune_models/models_arg/idefics_lora_20240521")
 
 check_inference(model, processor, prompts, max_new_tokens=100)
